@@ -1,0 +1,126 @@
+import re
+from typing import Optional
+from ai import call_gpt  # Certifique-se de que este módulo está disponível
+
+# Traduções das mensagens
+MESSAGES = {
+    "pt": {
+        "welcome": "🩺 olá! bem‑vindo ao seu plantão farmacêutico 🤗",
+        "intro": "vou checar possíveis interações entre seus medicamentos.\nsuas respostas são confidenciais — vamos com calma!\n",
+        "how_many": "quantos medicamentos você usa hoje? (ex.: 3) ",
+        "need_one": "preciso de pelo menos 1 medicamento…",
+        "need_number": "desculpe, preciso de um número…",
+        "med_name": "🌿 medicamento #{}: nome? ",
+        "med_dose": "dose em mg (ou Enter se não souber): ",
+        "noted": "✨ anotado!",
+        "summary": "\n📋 você informou:",
+        "checking": "\n⏳ verificando interações…",
+        "result": "\n💡 resultado:",
+        "ask_tips": "\nquer dicas de horários ou alimentos ideais para tomar seus remédios? (sim/não) ",
+        "getting_tips": "\n⏳ buscando orientações de uso…",
+        "tips": "\n🕑 orientações de uso:",
+        "bye": "\nobrigado por confiar em mim. cuide‑se! 🫶",
+        "yes": "sim",
+    },
+    "en": {
+        "welcome": "🩺 hello! welcome to your pharmaceutical assistant 🤗",
+        "intro": "I'll check for possible interactions between your medications.\nYour answers are confidential — let's go slowly!\n",
+        "how_many": "how many medications are you taking today? (e.g., 3) ",
+        "need_one": "I need at least 1 medication…",
+        "need_number": "sorry, I need a number…",
+        "med_name": "🌿 medication #{}: name? ",
+        "med_dose": "dosage in mg (or press Enter if unknown): ",
+        "noted": "✨ got it!",
+        "summary": "\n📋 you provided:",
+        "checking": "\n⏳ checking for interactions…",
+        "result": "\n💡 result:",
+        "ask_tips": "\nwould you like tips on the best times or foods to take your medications? (yes/no) ",
+        "getting_tips": "\n⏳ fetching usage guidance…",
+        "tips": "\n🕑 usage guidance:",
+        "bye": "\nthanks for trusting me. take care! 🫶",
+        "yes": "yes",
+    }
+}
+
+
+def parse_mg(txt: str) -> Optional[float]:
+    """Extrai valor numérico de texto (em mg)"""
+    if not txt:
+        return None
+    m = re.search(r"(\d+(?:[.,]\d+)?)", txt)
+    return float(m.group(1).replace(",", ".")) if m else None
+
+
+def format_med(nome: str, dose: Optional[float]) -> str:
+    """Formata o medicamento com dose ou 'desconhecida'"""
+    return f"{nome} ({dose} mg)" if dose is not None else f"{nome} (unknown dose)"
+
+
+def main() -> None:
+    # Escolha de idioma
+    lang = ""
+    while lang not in ("pt", "en"):
+        lang = input("Escolha o idioma / Choose language (pt/en): ").strip().lower()
+
+    msg = MESSAGES[lang]
+
+    print(msg["welcome"])
+    print(msg["intro"])
+
+    # Quantidade de medicamentos
+    n = 0
+    while n < 1:
+        try:
+            n = int(input(msg["how_many"]))
+            if n < 1:
+                print(msg["need_one"])
+        except ValueError:
+            print(msg["need_number"])
+
+    # Coleta dos medicamentos
+    meds = []
+    for i in range(1, n + 1):
+        nome = input(msg["med_name"].format(i)).strip()
+        dose_raw = input(msg["med_dose"]).strip() or None
+        dose = parse_mg(dose_raw)
+        meds.append((nome, dose))
+        print(msg["noted"])
+
+    print(msg["summary"])
+    for nome, dose in meds:
+        print("•", format_med(nome, dose))
+
+    # Monta pergunta sobre interação
+    pergunta_interacao = (
+        ("os remédios " if lang == "pt" else "do the medications ")
+        + ", ".join(format_med(n, d) for n, d in meds)
+        + (" têm alguma interação medicamentosa?" if lang == "pt" else " have any drug interactions?")
+    )
+
+    print(msg["checking"])
+    resposta_interacao = call_gpt(pergunta_interacao)
+
+    print(msg["result"])
+    print(resposta_interacao)
+
+    # Dicas de uso (horários e alimentos)
+    if input(msg["ask_tips"]).strip().lower() == msg["yes"]:
+        pergunta_dicas = (
+            ("quais os melhores horários, intervalos e combinações alimentares para tomar "
+             if lang == "pt" else
+             "what are the best times, intervals, and food combinations for taking ")
+            + ", ".join(n for n, _ in meds)
+            + ("? cite interações com alimentos se relevante." if lang == "pt"
+               else "? mention food interactions if relevant.")
+        )
+        print(msg["getting_tips"])
+        dicas_uso = call_gpt(pergunta_dicas)
+
+        print(msg["tips"])
+        print(dicas_uso)
+
+    print(msg["bye"])
+
+
+if __name__ == "__main__":
+    main()
