@@ -1,0 +1,124 @@
+from ai import call_gpt
+def main():
+    print("bem-vindo ao seu plantão farmacêutico… interação medicamentosa")
+    print("em breve vou perguntar o nome dos medicamentos e quantas miligramas você usa")
+    print("preparar…")
+    print("apontar…")
+
+    # 1º medicamento
+    nome_1 = input("qual o nome do primeiro medicamento? ")
+    posologia1 = None
+    if input("você sabe a posologia (mg)? (sim/não) ").lower() == "sim":
+        posologia1 = input("quantas miligramas? ")
+
+    # 2º medicamento
+    nome_2 = input("\nqual o nome do segundo medicamento? ")
+    posologia2 = None
+    if input("você sabe a posologia (mg)? (sim/não) ").lower() == "sim":
+        posologia2 = input("quantas miligramas? ")
+    print("Pensando...")
+    pergunta = (
+        f"os remédios {nome_1} ({posologia1 or 'dose desconhecida'}) e "
+        f"{nome_2} ({posologia2 or 'dose desconhecida'}) têm alguma interação medicamentosa?"
+    )
+
+    resposta = call_gpt(pergunta)
+    print("\nresultado:", resposta)
+
+
+if __name__ == "__main__":
+    main()
+
+#ideias
+# mandar mensagem quando for a hora do remédio
+#interação medicamentosa
+#como melhor tomar
+
+
+import re
+from ai import call_gpt
+
+
+def parse_mg(txt: str) -> float | None:
+    """
+    Extrai a primeira quantidade numérica (int ou float) do texto e devolve em mg.
+    Aceita formatos como '500', '500mg', '500 mg', '500,5', etc.
+    """
+    if not txt:
+        return None
+    m = re.search(r"(\d+(?:[.,]\d+)?)", txt)
+    return float(m.group(1).replace(",", ".")) if m else None
+
+
+def format_med(nome: str, dose: float | None) -> str:
+    """Formata nome + dose para exibição."""
+    return f"{nome} ({dose} mg)" if dose is not None else f"{nome} (dose desconhecida)"
+
+
+def main() -> None:
+    print("🩺 olá! bem‑vindo ao seu plantão farmacêutico 🤗")
+    print("vou checar possíveis interações entre seus medicamentos.")
+    print("suas respostas são confidenciais — vamos com calma!\n")
+
+    # pergunta quantos medicamentos
+    n = 0
+    while n < 1:
+        try:
+            n = int(input("quantos medicamentos você usa hoje? (ex.: 3) "))
+            if n < 1:
+                print("preciso de pelo menos 1 medicamento…")
+        except ValueError:
+            print("desculpe, preciso de um número…")
+
+    # coleta meds
+    meds: list[tuple[str, float | None]] = []
+    for i in range(1, n + 1):
+        nome = input(f"\n🌿 medicamento #{i}: nome? ").strip()
+        dose_raw = input("dose em mg (ou Enter se não souber): ").strip() or None
+        dose = parse_mg(dose_raw)
+        meds.append((nome, dose))
+        print("✨ anotado!")
+
+    # resumo
+    print("\n📋 você informou:")
+    for nome, dose in meds:
+        print("•", format_med(nome, dose))
+
+    # monta pergunta de interação
+    pergunta_interacao = (
+        "os remédios "
+        + ", ".join(format_med(n, d) for n, d in meds)
+        + " têm alguma interação medicamentosa?"
+    )
+
+    print("\n⏳ verificando interações…")
+    resposta_interacao = call_gpt(pergunta_interacao)
+
+    print("\n💡 resultado:")
+    print(resposta_interacao)
+
+    # pergunta extra sobre horários / alimentos
+    if (
+        input(
+            "\nquer dicas de horários ou alimentos ideais para tomar seus remédios? (sim/não) "
+        )
+        .strip()
+        .lower()
+        == "sim"
+    ):
+        pergunta_dicas = (
+            "quais os melhores horários, intervalos e combinações alimentares para tomar "
+            + ", ".join(n for n, _ in meds)
+            + "? cite interações com alimentos se relevante."
+        )
+        print("\n⏳ buscando orientações de uso…")
+        dicas_uso = call_gpt(pergunta_dicas)
+
+        print("\n🕑 orientações de uso:")
+        print(dicas_uso)
+
+    print("\nobrigado por confiar em mim. cuide‑se! 🫶")
+
+
+if __name__ == "__main__":
+    main()
